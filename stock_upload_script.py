@@ -17,7 +17,7 @@ class NumbersProfile:
         self.number = start_value-1
         self.prefix = prefix
 
-    def get_next_number_as_string(self, padding: bool = True) -> (str, str):
+    def get_next_number_as_string(self, padding: bool = True) -> str:
         """ Next number profile """
         paddingstr = ""
         suffix = self.get_next_suffix_value()
@@ -45,6 +45,7 @@ class StockUploadConfig:
                  generate_serial: bool = False,         \
                  generate_hu: bool = False,             \
                  ) -> None:
+
         self.name = name
         self.standard_bin = standard_bin
         self.row = 1
@@ -131,7 +132,7 @@ final_file_title_conv = {
 
 final_row_length = len(final_file_title_conv.keys())
 
-def get_blocks_from_file(file_name: str, relevant_blocks: dict) -> dict:
+def get_blocks_from_file(file_name: str, relevant_blocks: list[str]) -> dict:
     """ Get all the blockings inside a dictionary """
     blocks = {}
 
@@ -160,7 +161,9 @@ def get_stock_and_bin(hu: str, hu_blocks: dict, standard_bin: str):
     stock_type = ""
     ewm_bin = ""
 
-    if hu_blocks.get(hu):
+    blocked_hu = hu_blocks.get(hu)
+
+    if blocked_hu:
         sparr_to_stock_type = {
             'O': {
                 "stock_type" : "B2",
@@ -173,15 +176,15 @@ def get_stock_and_bin(hu: str, hu_blocks: dict, standard_bin: str):
                 "bin": standard_bin}
         }
 
-        stock_type = sparr_to_stock_type[hu_blocks.get(hu)[0]]["stock_type"]
-        ewm_bin = sparr_to_stock_type[hu_blocks.get(hu)[0]]["bin"]
+        stock_type = sparr_to_stock_type[blocked_hu[0]]["stock_type"]
+        ewm_bin = sparr_to_stock_type[blocked_hu(hu)[0]]["bin"]
     else:
         stock_type = STANDARD_CAT
         ewm_bin = standard_bin
 
     return stock_type, ewm_bin
 
-def get_hu_number(length: int, prefix: str, suffix: str) -> (str, str):
+def get_hu_number(length: int, prefix: str, suffix: str) -> tuple[str, str]:
     """ returns a hu number based on the total length (HU_LENGTH),  \
         the prefix (VENDOR) and suffix (PACKAGE ID)                 \
         - padding done in the middle with 0:s normal HU             \
@@ -202,8 +205,8 @@ def get_hu_number(length: int, prefix: str, suffix: str) -> (str, str):
 def create_entry_per_hu(input_row: list[str],                       \
                         config: StockUploadConfig,                  \
                         data: PeriphiralData,                       \
-                        gen_serial_numbers: NumbersProfile = None,  \
-                        gen_hu_numbers: NumbersProfile = None       \
+                        gen_serial_numbers: NumbersProfile,  \
+                        gen_hu_numbers: NumbersProfile       \
                             ) -> list[dict]:
 
     """ Creates necessary entries for an HU, from a raw source """
@@ -425,6 +428,7 @@ def create_stock_upload_file(file_name: str,                        \
                     data=data,                                         \
                     gen_serial_numbers=gen_serial_numbers,             \
                     gen_hu_numbers=gen_hu_numbers)
+
             elif config.consider_serial and len(row[9]) > 0:
                 entries = create_entry_per_serial(input_row = row, config=config, data=data)
 
@@ -545,7 +549,7 @@ config_ks1j = StockUploadConfig(
 # config_               // ... more
 
 create_stock_upload_file(SOURCE_FILE,                           \
-                         config=config_o_blanks,                \
+                         config=config_high_bay,                \
                          data=periphiral_data,                  \
                          gen_serial_numbers=gen_serial_numbers, \
                          gen_hu_numbers=gen_hu_numbers)
