@@ -484,6 +484,17 @@ def get_qty_per_hu_from_file(file_name: str) -> dict:
     return mat_hu_qty
 
 
+#########################################
+# THIS SCRIPT IS USED TO CONVERT STOCK  #
+# LEGACY SYSTEMS TO AN UPLOAD FILE FOR  #
+# SAP S/4 EWM STOCK UPLOAD.             #
+#                                       #
+# The script works with .csv files as   #
+# sources, below you can find different #
+# types of settings you can do in the   #
+# script.                               #
+#########################################
+
 DELIMITER = ","
 
 STANDARD_PMAT = "8289999"
@@ -498,20 +509,20 @@ STANDARD_MANDT = "100"
 RELEVANT_BLOCK_TYPES = ['O', 'K', "S"]
 
 # Files must exist inside source folder
-BLOCK_DATA_FILE = "legacy_block.csv"
-MAT_QTY_PER_HU_FILE = "mat_qty_per_hu.csv"
-SOURCE_FILE = "legacy_stock_template.csv"
+BLOCK_DATA_FILE = "legacy_block.csv"        # Blocking data file
+MAT_QTY_PER_HU_FILE = "mat_qty_per_hu.csv"  # Quantity per pallet file
+SOURCE_FILE = "legacy_stock_template.csv"   # Source file for stock
 
 blocks_dict = get_blocks_from_file(BLOCK_DATA_FILE, RELEVANT_BLOCK_TYPES)
 mat_hu_qty_dict = get_qty_per_hu_from_file(MAT_QTY_PER_HU_FILE)
-
 periphiral_data = PeriphiralData(blocks_dict, mat_hu_qty_dict)
 
 
-gen_serial_numbers = NumbersProfile(length=10, start_value=1, prefix='S')
+# Change below values to update the prefix and number ranges for serial numbers and HU:s
+gen_serial_numbers = NumbersProfile(
+    length=10, start_value=1, prefix="S")
 gen_hu_numbers = NumbersProfile(
-    length=14, start_value=900000000, prefix="00000")
-
+    length=14, start_value=900000000, prefix="AEX15")
 
 config_high_bay = StockUploadConfig(
     name="high_bay",               # Config name, affects file out name
@@ -556,17 +567,40 @@ config_ks1j = StockUploadConfig(
     generate_hu=False,
 )
 
+config_psa = StockUploadConfig(
+    name="psa",
+    record_quant=True,
+    record_hu=False,
+    consider_bin=True,
+    consider_serial=True,
+    generate_serial=False,
+    generate_hu=False,
+)
+
 
 # CHANGE config= PARAMETER TO TRIGGER CORRECT UPLOAD CONVERTION
 # Possible configs below, new can be added
 # confing_high_bay      // used for stock inside high bay
 # config_plm3           // used for stock inside plm3
-# config_blanks         // used for stock at inbound blanks
+# config_o_blanks       // used for stock at inbound blanks
 # config_psa            // used for stock at line side
-# config_               // ... more
+# config_ks1j           // used for stock inside KS1J
+#
+#
+# If you want to create a new config, these are the possible parameters:
+# name                           // Affects file out name
+# standard_bin="HIGH BAY BIN",   // If only one bin specific bin should be used, e.g. in high bay
+# blocked_bin="??REPACK BIN",    // If another bin needs to be used for blocked stock, e.g. in high bay
+# record_quant=True,             // Should always be true
+# record_hu=True,                // Records HU from source file
+# consider_bin=False,            // Records the bin from source file
+# consider_serial=False,         // Records serial number from source file
+# generate_serial=False,         // Generates custom serial
+# generate_hu=True,              // Generates custom HU:s from mat_qty_per_hu.csv
+
 
 create_stock_upload_file(SOURCE_FILE,
-                         config=config_o_blanks,
+                         config=config_high_bay,
                          data=periphiral_data,
                          gen_serial_numbers=gen_serial_numbers,
                          gen_hu_numbers=gen_hu_numbers)
