@@ -1,17 +1,14 @@
 """ CSV MODULE IMPORT"""
 import csv
 import sys
+import os
 
 from datetime import datetime
 
-# class RowCounters:
-#     """ Object which holds different types of counters"""
-#     def __init__(self) -> None:
-#         self.serial_ctr = 0
-#         self.gen_hu_ctr = 0
 
 class NumbersProfile:
     """ Class for holding numbers profiles """
+
     def __init__(self, length: int, start_value: int, prefix: str) -> None:
         self.length = length
         self.number = start_value-1
@@ -34,20 +31,24 @@ class NumbersProfile:
         self.number += 1
         return str(self.number)
 
+
 class StockUploadConfig:
     """ Setting the configuration of how the stock upload should be done. """
-    def __init__(self, name: str = "",                  \
-                 standard_bin: str = "",                \
-                 record_hu: bool = False,               \
-                 record_quant: bool = False,            \
-                 consider_bin: bool = False,            \
-                 consider_serial: bool = False,         \
-                 generate_serial: bool = False,         \
-                 generate_hu: bool = False,             \
+
+    def __init__(self, name: str = "",
+                 standard_bin: str = "",
+                 blocked_bin: str = "",
+                 record_hu: bool = False,
+                 record_quant: bool = False,
+                 consider_bin: bool = False,
+                 consider_serial: bool = False,
+                 generate_serial: bool = False,
+                 generate_hu: bool = False,
                  ) -> None:
 
         self.name = name
         self.standard_bin = standard_bin
+        self.blocked_bin = blocked_bin
         self.row = 1
         self.record_quant = record_quant
         self.record_hu = record_hu
@@ -56,11 +57,14 @@ class StockUploadConfig:
         self.generate_serial = generate_serial
         self.generate_hu = generate_hu
 
+
 class PeriphiralData:
     """ Objcet which passes data, for e.g. blocks and qty per hu """
+
     def __init__(self, blocks: dict, qty_per_hu: dict) -> None:
         self.blocks = blocks
         self.qty_per_hu = qty_per_hu
+
 
 final_file_title_conv = {
     "MANDT": 0,
@@ -127,10 +131,11 @@ final_file_title_conv = {
     "UII": 61,
     "DUMMY_ISU": 62,
     "ZEUGN": 63,
-    "AMOUNT_LC": 64 
+    "AMOUNT_LC": 64
 }
 
 final_row_length = len(final_file_title_conv.keys())
+
 
 def get_blocks_from_file(file_name: str, relevant_blocks: list[str]) -> dict:
     """ Get all the blockings inside a dictionary """
@@ -153,10 +158,10 @@ def get_blocks_from_file(file_name: str, relevant_blocks: list[str]) -> dict:
             else:
                 blocks[hu] = [block_type]
 
-
     return blocks
 
-def get_stock_and_bin(hu: str, hu_blocks: dict, standard_bin: str):
+
+def get_stock_and_bin(hu: str, hu_blocks: dict, standard_bin: str, blocked_bin: str):
     """ Get stock type and bin if hu is blocked or not. Is only relevant in high bay. """
     stock_type = ""
     ewm_bin = ""
@@ -166,23 +171,24 @@ def get_stock_and_bin(hu: str, hu_blocks: dict, standard_bin: str):
     if blocked_hu:
         sparr_to_stock_type = {
             'O': {
-                "stock_type" : "B2",
-                "bin": "??REPACK BIN??"},
+                "stock_type": "B2",
+                "bin": blocked_bin},
             'K': {
                 "stock_type": "B2",
-                "bin": standard_bin },
+                "bin": standard_bin},
             'S': {
                 "stock_type": "B2",
                 "bin": standard_bin}
         }
 
         stock_type = sparr_to_stock_type[blocked_hu[0]]["stock_type"]
-        ewm_bin = sparr_to_stock_type[blocked_hu(hu)[0]]["bin"]
+        ewm_bin = sparr_to_stock_type[blocked_hu[0]]["bin"]
     else:
         stock_type = STANDARD_CAT
         ewm_bin = standard_bin
 
     return stock_type, ewm_bin
+
 
 def get_hu_number(length: int, prefix: str, suffix: str) -> tuple[str, str]:
     """ returns a hu number based on the total length (HU_LENGTH),  \
@@ -195,40 +201,37 @@ def get_hu_number(length: int, prefix: str, suffix: str) -> tuple[str, str]:
     hu_short = prefix + suffix
     hu = prefix + hu_padding + suffix
 
-    # superprefix = ""
-
-    # if prefix[0].isdigit:
-    #     superprefix = "'"
-
     return hu, hu_short
 
-def create_entry_per_hu(input_row: list[str],                       \
-                        config: StockUploadConfig,                  \
-                        data: PeriphiralData,                       \
-                        gen_serial_numbers: NumbersProfile,  \
-                        gen_hu_numbers: NumbersProfile       \
-                            ) -> list[dict]:
 
+def create_entry_per_hu(input_row: list[str],
+                        config: StockUploadConfig,
+                        data: PeriphiralData,
+                        gen_serial_numbers: NumbersProfile,
+                        gen_hu_numbers: NumbersProfile
+                        ) -> list[dict]:
     """ Creates necessary entries for an HU, from a raw source """
 
     if config.consider_serial and gen_serial_numbers == 0:
         print("Serialized true, and no serial number suffix. Please rectify.")
         quit()
 
-    hu, hu_short = get_hu_number(gen_hu_numbers.length, input_row[0], input_row[1])
+    hu, hu_short = get_hu_number(
+        gen_hu_numbers.length, input_row[0], input_row[1])
 
-    hutype          = input_row[6]
-    material        = input_row[5]
-    quantity        = input_row[7]
-    grdate          = input_row[2]
-    grtime          = input_row[3]
+    hutype = input_row[6]
+    material = input_row[5]
+    quantity = input_row[7]
+    grdate = input_row[2]
+    grtime = input_row[3]
     # serial_number   = input_row[9]
-    ref_row         = -1
-    stock_type      = ""
-    ewm_bin         = ""
+    ref_row = -1
+    stock_type = ""
+    ewm_bin = ""
 
     if config.consider_bin is False:
-        stock_type, ewm_bin = get_stock_and_bin(hu_short, data.blocks, config.standard_bin)
+        stock_type, ewm_bin = get_stock_and_bin(
+            hu_short, data.blocks, config.standard_bin, config.blocked_bin)
     else:
         ewm_bin = input_row[4]
         stock_type = STANDARD_CAT
@@ -247,15 +250,15 @@ def create_entry_per_hu(input_row: list[str],                       \
         for _ in range(len(final_file_title_conv)):
             row.append("")
 
-        row[final_file_title_conv["MANDT"]]            = STANDARD_MANDT
-        row[final_file_title_conv["POSTYPE"]]          = "1"
-        row[final_file_title_conv["HUIDENT"]]          = hu
-        row[final_file_title_conv["LGPLA"]]            = ewm_bin
-        row[final_file_title_conv["HUTYP"]]            = hutype
-        row[final_file_title_conv["TOPHUIDENT"]]       = hu
-        row[final_file_title_conv["PMAT"]]             = STANDARD_PMAT
-        row[final_file_title_conv["EXTNO"]]            = "X"
-        row[final_file_title_conv["ROW"]]              = str(config.row)
+        row[final_file_title_conv["MANDT"]] = STANDARD_MANDT
+        row[final_file_title_conv["POSTYPE"]] = "1"
+        row[final_file_title_conv["HUIDENT"]] = hu
+        row[final_file_title_conv["LGPLA"]] = ewm_bin
+        row[final_file_title_conv["HUTYP"]] = hutype
+        row[final_file_title_conv["TOPHUIDENT"]] = hu
+        row[final_file_title_conv["PMAT"]] = STANDARD_PMAT
+        row[final_file_title_conv["EXTNO"]] = "X"
+        row[final_file_title_conv["ROW"]] = str(config.row)
 
         config.row += 1
         return_list.append(row)
@@ -278,15 +281,15 @@ def create_entry_per_hu(input_row: list[str],                       \
 
             generated_hu = gen_hu_numbers.get_next_number_as_string()
 
-            row[final_file_title_conv["MANDT"]]            = STANDARD_MANDT
-            row[final_file_title_conv["POSTYPE"]]          = "2"
-            row[final_file_title_conv["HUIDENT"]]          = generated_hu
-            row[final_file_title_conv["LGPLA"]]            = ewm_bin
-            row[final_file_title_conv["HUTYP"]]            = hutype
-            row[final_file_title_conv["TOPHUIDENT"]]       = hu
-            row[final_file_title_conv["PMAT"]]             = STANDARD_PMAT
-            row[final_file_title_conv["EXTNO"]]            = "X"
-            row[final_file_title_conv["ROW"]]              = str(config.row)
+            row[final_file_title_conv["MANDT"]] = STANDARD_MANDT
+            row[final_file_title_conv["POSTYPE"]] = "2"
+            row[final_file_title_conv["HUIDENT"]] = generated_hu
+            row[final_file_title_conv["LGPLA"]] = ewm_bin
+            row[final_file_title_conv["HUTYP"]] = hutype
+            row[final_file_title_conv["TOPHUIDENT"]] = hu
+            row[final_file_title_conv["PMAT"]] = STANDARD_PMAT
+            row[final_file_title_conv["EXTNO"]] = "X"
+            row[final_file_title_conv["ROW"]] = str(config.row)
 
             config.row += 1
             return_list.append(row)
@@ -296,25 +299,25 @@ def create_entry_per_hu(input_row: list[str],                       \
             for _ in range(len(final_file_title_conv)):
                 row.append("")
 
-            row[final_file_title_conv["MANDT"]]            = STANDARD_MANDT
-            row[final_file_title_conv["POSTYPE"]]          = "4"
-            row[final_file_title_conv["MATNR"]]            = material
-            row[final_file_title_conv["OWNER"]]            = STANDARD_OWNER
-            row[final_file_title_conv["OWNER_ROLE"]]       = STANDARD_OWNER_ROLE
-            row[final_file_title_conv["CAT"]]              = stock_type
-            row[final_file_title_conv["ENTITELED"]]        = STANDARD_ENTITELED
-            row[final_file_title_conv["ENTITLED_ROLE"]]    = STANDARD_ENTITLED_ROLE
-            row[final_file_title_conv["QUAN"]]             = str(new_hu_qty)
-            row[final_file_title_conv["UNIT"]]             = STANDARD_UNIT
-            row[final_file_title_conv["LGPLA"]]            = ewm_bin
-            row[final_file_title_conv["GR_DATE"]]          = grdate
-            row[final_file_title_conv["GR_TIME"]]          = grtime
-            row[final_file_title_conv["VFDAT"]]            = grdate
-            row[final_file_title_conv["HUIDENT"]]          = generated_hu
-            row[final_file_title_conv["TOPHUIDENT"]]       = hu
-            row[final_file_title_conv["ROW"]]              = str(config.row)
+            row[final_file_title_conv["MANDT"]] = STANDARD_MANDT
+            row[final_file_title_conv["POSTYPE"]] = "4"
+            row[final_file_title_conv["MATNR"]] = material
+            row[final_file_title_conv["OWNER"]] = STANDARD_OWNER
+            row[final_file_title_conv["OWNER_ROLE"]] = STANDARD_OWNER_ROLE
+            row[final_file_title_conv["CAT"]] = stock_type
+            row[final_file_title_conv["ENTITELED"]] = STANDARD_ENTITELED
+            row[final_file_title_conv["ENTITLED_ROLE"]] = STANDARD_ENTITLED_ROLE
+            row[final_file_title_conv["QUAN"]] = str(new_hu_qty)
+            row[final_file_title_conv["UNIT"]] = STANDARD_UNIT
+            row[final_file_title_conv["LGPLA"]] = ewm_bin
+            row[final_file_title_conv["GR_DATE"]] = grdate
+            row[final_file_title_conv["GR_TIME"]] = grtime
+            row[final_file_title_conv["VFDAT"]] = grdate
+            row[final_file_title_conv["HUIDENT"]] = generated_hu
+            row[final_file_title_conv["TOPHUIDENT"]] = hu
+            row[final_file_title_conv["ROW"]] = str(config.row)
 
-            ## Used for referencing higher level of HU for the serials later on
+            # Used for referencing higher level of HU for the serials later on
             ref_row = row[final_file_title_conv["ROW"]]
 
             return_list.append(row)
@@ -328,32 +331,31 @@ def create_entry_per_hu(input_row: list[str],                       \
         for _ in range(len(final_file_title_conv)):
             row.append("")
 
-        row[final_file_title_conv["MANDT"]]            = STANDARD_MANDT
-        row[final_file_title_conv["POSTYPE"]]          = "4"
-        row[final_file_title_conv["MATNR"]]            = material
-        row[final_file_title_conv["OWNER"]]            = STANDARD_OWNER
-        row[final_file_title_conv["OWNER_ROLE"]]       = STANDARD_OWNER_ROLE
-        row[final_file_title_conv["CAT"]]              = stock_type
-        row[final_file_title_conv["ENTITELED"]]        = STANDARD_ENTITELED
-        row[final_file_title_conv["ENTITLED_ROLE"]]    = STANDARD_ENTITLED_ROLE
-        row[final_file_title_conv["QUAN"]]             = quantity
-        row[final_file_title_conv["UNIT"]]             = STANDARD_UNIT
-        row[final_file_title_conv["LGPLA"]]            = ewm_bin
-        row[final_file_title_conv["GR_DATE"]]          = grdate
-        row[final_file_title_conv["GR_TIME"]]          = grtime
-        row[final_file_title_conv["VFDAT"]]            = grdate
-        row[final_file_title_conv["HUIDENT"]]          = hu
-        row[final_file_title_conv["TOPHUIDENT"]]       = hu
-        row[final_file_title_conv["ROW"]]              = str(config.row)
+        row[final_file_title_conv["MANDT"]] = STANDARD_MANDT
+        row[final_file_title_conv["POSTYPE"]] = "4"
+        row[final_file_title_conv["MATNR"]] = material
+        row[final_file_title_conv["OWNER"]] = STANDARD_OWNER
+        row[final_file_title_conv["OWNER_ROLE"]] = STANDARD_OWNER_ROLE
+        row[final_file_title_conv["CAT"]] = stock_type
+        row[final_file_title_conv["ENTITELED"]] = STANDARD_ENTITELED
+        row[final_file_title_conv["ENTITLED_ROLE"]] = STANDARD_ENTITLED_ROLE
+        row[final_file_title_conv["QUAN"]] = quantity
+        row[final_file_title_conv["UNIT"]] = STANDARD_UNIT
+        row[final_file_title_conv["LGPLA"]] = ewm_bin
+        row[final_file_title_conv["GR_DATE"]] = grdate
+        row[final_file_title_conv["GR_TIME"]] = grtime
+        row[final_file_title_conv["VFDAT"]] = grdate
+        row[final_file_title_conv["HUIDENT"]] = hu
+        row[final_file_title_conv["TOPHUIDENT"]] = hu
+        row[final_file_title_conv["ROW"]] = str(config.row)
 
-        ## Used for referencing higher level of HU for the serials later on
+        # Used for referencing higher level of HU for the serials later on
         ref_row = row[final_file_title_conv["ROW"]]
 
         config.row += 1
         return_list.append(row)
-    
-    # if config.record_serial:
 
+    # if config.record_serial:
 
     if config.generate_serial:
         for i in range(int(quantity)):
@@ -364,15 +366,16 @@ def create_entry_per_hu(input_row: list[str],                       \
             for _ in range(len(final_file_title_conv)):
                 row.append("")
 
-            row[final_file_title_conv["MANDT"]]         = STANDARD_MANDT
-            row[final_file_title_conv["POSTYPE"]]       = "6"
-            row[final_file_title_conv["ROW"]]           = str(config.row)
-            row[final_file_title_conv["SERNR"]]         = ser_nr
+            row[final_file_title_conv["MANDT"]] = STANDARD_MANDT
+            row[final_file_title_conv["POSTYPE"]] = "6"
+            row[final_file_title_conv["ROW"]] = str(config.row)
+            row[final_file_title_conv["SERNR"]] = ser_nr
 
             if ref_row == -1:
-                row[final_file_title_conv["REFROW"]]    = row[final_file_title_conv["ROW"]]
+                row[final_file_title_conv["REFROW"]
+                    ] = row[final_file_title_conv["ROW"]]
             else:
-                row[final_file_title_conv["REFROW"]]    = str(ref_row)
+                row[final_file_title_conv["REFROW"]] = str(ref_row)
 
             config.row += 1
             return_list.append(row)
@@ -384,6 +387,7 @@ def create_entry_per_hu(input_row: list[str],                       \
 
     return return_list
 
+
 def create_entry_per_serial(input_row: list[str], config: StockUploadConfig, data: PeriphiralData):
     ser_nr = input_row[9]
 
@@ -394,23 +398,23 @@ def create_entry_per_serial(input_row: list[str], config: StockUploadConfig, dat
     for _ in range(len(final_file_title_conv)):
         row.append("")
 
-    row[final_file_title_conv["MANDT"]]         = STANDARD_MANDT
-    row[final_file_title_conv["POSTYPE"]]       = "6"
-    row[final_file_title_conv["ROW"]]           = str(config.row)
-    row[final_file_title_conv["SERNR"]]         = ser_nr
+    row[final_file_title_conv["MANDT"]] = STANDARD_MANDT
+    row[final_file_title_conv["POSTYPE"]] = "6"
+    row[final_file_title_conv["ROW"]] = str(config.row)
+    row[final_file_title_conv["SERNR"]] = ser_nr
 
     return return_list
 
-def create_stock_upload_file(file_name: str,                        \
-                             config: StockUploadConfig,             \
-                             data: PeriphiralData,                  \
-                             gen_serial_numbers: NumbersProfile,    \
-                             gen_hu_numbers: NumbersProfile) -> None:
 
+def create_stock_upload_file(file_name: str,
+                             config: StockUploadConfig,
+                             data: PeriphiralData,
+                             gen_serial_numbers: NumbersProfile,
+                             gen_hu_numbers: NumbersProfile) -> None:
     """ Main function for creating the final file """
     with open(file_name, "r", encoding="UTF-8-SIG") as file:
-        reader                      = csv.reader(file, delimiter=DELIMITER)
-        first_row                   = str(next(reader))
+        reader = csv.reader(file, delimiter=DELIMITER)
+        first_row = str(next(reader))
 
         titles = first_row.split(DELIMITER)
         titles_dictionary = {}
@@ -423,22 +427,30 @@ def create_stock_upload_file(file_name: str,                        \
         for _, row in enumerate(reader):
             if config.consider_serial is False:
                 entries = create_entry_per_hu(
-                    input_row = row,                                   \
-                    config=config,                                     \
-                    data=data,                                         \
-                    gen_serial_numbers=gen_serial_numbers,             \
+                    input_row=row,
+                    config=config,
+                    data=data,
+                    gen_serial_numbers=gen_serial_numbers,
                     gen_hu_numbers=gen_hu_numbers)
 
             elif config.consider_serial and len(row[9]) > 0:
-                entries = create_entry_per_serial(input_row = row, config=config, data=data)
+                entries = create_entry_per_serial(
+                    input_row=row, config=config, data=data)
 
             for entry in entries:
                 final_entries.append(entry)
 
     current_date_time = datetime.now()
     current_date_time_str = current_date_time.strftime("%Y%m%d%H%M%S")
-    folder = "upload_files/"
-    target_file = f"{folder}stock_upload_{config.name}_{current_date_time_str}.csv"
+    folder = "upload_files"
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+        print(f"Created folder: {folder}.")
+    else:
+        print("Upload folder already exists")
+
+    target_file = f"{folder}/stock_upload_{config.name}_{current_date_time_str}.csv"
 
     with open(target_file, "w", encoding="UTF-8-SIG", newline='') as file:
         writer = csv.writer(file, delimiter=DELIMITER)
@@ -465,91 +477,96 @@ def get_qty_per_hu_from_file(file_name: str) -> dict:
             if existing_key is None:
                 mat_hu_qty[material] = qty
             else:
-                print("Duplicate material found, " \
-                      +"please look into source file for material and hu qty")
+                print("Duplicate material found, "
+                      + "please look into source file for material and hu qty")
                 sys.exit()
 
-    return mat_hu_qty 
+    return mat_hu_qty
 
-DELIMITER               = ","
 
-STANDARD_PMAT           = "8289999"
-STANDARD_OWNER          = "BP1101EWM"
-STANDARD_OWNER_ROLE     = "BP"
-STANDARD_CAT            = "F2"
-STANDARD_ENTITELED      = "BP1101EWM"
-STANDARD_ENTITLED_ROLE  = "BP"
-STANDARD_UNIT           = "PCE"
-STANDARD_MANDT          = "100"
+DELIMITER = ","
 
-RELEVANT_BLOCK_TYPES    = ['O', 'K', "S"]
+STANDARD_PMAT = "8289999"
+STANDARD_OWNER = "BP1101EWM"
+STANDARD_OWNER_ROLE = "BP"
+STANDARD_CAT = "F2"
+STANDARD_ENTITELED = "BP1101EWM"
+STANDARD_ENTITLED_ROLE = "BP"
+STANDARD_UNIT = "PCE"
+STANDARD_MANDT = "100"
 
-BLOCK_DATA_FILE         = "legacy_block.csv"    # File must exist inside source folder
-MAT_QTY_PER_HU_FILE     = "mat_qty_per_hu.csv"  # File must exist inside source folder
-SOURCE_FILE             = "legacy_stock_test_serials.csv"    # File must exist inside source folder
+RELEVANT_BLOCK_TYPES = ['O', 'K', "S"]
+
+# Files must exist inside source folder
+BLOCK_DATA_FILE = "legacy_block.csv"
+MAT_QTY_PER_HU_FILE = "mat_qty_per_hu.csv"
+SOURCE_FILE = "legacy_stock_template.csv"
 
 blocks_dict = get_blocks_from_file(BLOCK_DATA_FILE, RELEVANT_BLOCK_TYPES)
 mat_hu_qty_dict = get_qty_per_hu_from_file(MAT_QTY_PER_HU_FILE)
 
 periphiral_data = PeriphiralData(blocks_dict, mat_hu_qty_dict)
 
+
 gen_serial_numbers = NumbersProfile(length=10, start_value=1, prefix='S')
-gen_hu_numbers = NumbersProfile(length=14, start_value=900000000, prefix="00000")
+gen_hu_numbers = NumbersProfile(
+    length=14, start_value=900000000, prefix="00000")
 
 
 config_high_bay = StockUploadConfig(
-    name                = "high_bay",
-    standard_bin        = "HIGH BAY BIN",
-    record_quant        = True,
-    record_hu           = True,
-    consider_bin        = False,
-    consider_serial     = False,
-    generate_serial     = False,
-    generate_hu         = True,
+    name="high_bay",               # Config name, affects file out name
+    standard_bin="HIGH BAY BIN",   # Use one bin for all stock inside high bay
+    blocked_bin="??REPACK BIN",    # Use one bin for all stock inside high bay
+    record_quant=True,             # Should always be true
+    record_hu=True,                # Records HU from source file
+    consider_bin=False,            # Records the bin from source file
+    consider_serial=False,         # Records serial number from source file
+    generate_serial=False,         # Generates custom serial
+    generate_hu=True,              # Generates custom HU:s from mat_qty_per_hu.csv
 )
 
 config_plm3 = StockUploadConfig(
-    name                = "plm3",
-    record_quant        = True,
-    record_hu           = True,
-    consider_bin        = True,
-    consider_serial     = False,
-    generate_serial     = False,
-    generate_hu         = False,
+    name="plm3",
+    record_quant=True,
+    record_hu=True,
+    consider_bin=True,
+    consider_serial=False,
+    generate_serial=False,
+    generate_hu=False,
 )
 
 config_o_blanks = StockUploadConfig(
-    name                = "o_blanks",
-    record_quant        = True,
-    record_hu           = True,
-    consider_bin        = False,
-    consider_serial     = False,
-    generate_serial     = True,
-    generate_hu         = False,
+    name="o_blanks",
+    record_quant=True,
+    record_hu=True,
+    consider_bin=False,
+    consider_serial=False,
+    generate_serial=True,
+    generate_hu=False,
 )
 
 config_ks1j = StockUploadConfig(
-    name                = "ks1j",
-    standard_bin        = "KS1J_BIN",
-    record_quant        = True,
-    record_hu           = False,
-    consider_bin        = False,
-    consider_serial     = True,
-    generate_serial     = False,
-    generate_hu         = False,
+    name="ks1j",
+    standard_bin="KS1J_BIN",
+    record_quant=True,
+    record_hu=False,
+    consider_bin=False,
+    consider_serial=True,
+    generate_serial=False,
+    generate_hu=False,
 )
 
 
 # CHANGE config= PARAMETER TO TRIGGER CORRECT UPLOAD CONVERTION
-# Possible config= s:
+# Possible configs below, new can be added
 # confing_high_bay      // used for stock inside high bay
-# config_plm3           // used for stock inside plm3   
+# config_plm3           // used for stock inside plm3
 # config_blanks         // used for stock at inbound blanks
 # config_psa            // used for stock at line side
 # config_               // ... more
 
-create_stock_upload_file(SOURCE_FILE,                           \
-                         config=config_high_bay,                \
-                         data=periphiral_data,                  \
-                         gen_serial_numbers=gen_serial_numbers, \
+create_stock_upload_file(SOURCE_FILE,
+                         config=config_o_blanks,
+                         data=periphiral_data,
+                         gen_serial_numbers=gen_serial_numbers,
                          gen_hu_numbers=gen_hu_numbers)
